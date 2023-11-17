@@ -13,6 +13,7 @@
  */
 
 #include <linux/types.h>
+#include <asm/pgtable.h>
 
 u64 __arm64_get_vn_dt(int n, int t) {
 	u64 res;
