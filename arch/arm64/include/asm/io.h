@@ -281,6 +281,9 @@ static inline void __iomem *ioremap_prot(phys_addr_t phys, size_t size,
 }
 #define ioremap_prot ioremap_prot
 
+pgprot_t ioremap_map_prot(phys_addr_t phys_addr, size_t size, pgprot_t prot);
+#define ioremap_map_prot ioremap_map_prot
+
 #define ioremap(addr, size)	\
 	__ioremap_prot((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
 #define ioremap_wc(addr, size)	\
