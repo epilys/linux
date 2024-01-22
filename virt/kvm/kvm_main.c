@@ -2667,8 +2667,11 @@ static int hva_to_pfn_remapped(struct vm_area_struct *vma,
 	 * would then underflow the refcount when the caller does the
 	 * required put_page. Don't allow those pages here.
 	 */
-	if (!kvm_try_get_pfn(pfn))
-		r = -EFAULT;
+	if (!kvm_try_get_pfn(pfn)) {
+		// r = -EFAULT;
+	    printk("Not force EFAULT: %s %d r = %d, pfn = 0x%016llx\n", __FUNCTION__, __LINE__, r, pfn);
+    // https://www.collabora.com/news-and-blog/blog/2021/11/26/venus-on-qemu-enabling-new-virtual-vulkan-driver/#qcom1343
+  }
 
 out:
 	pte_unmap_unlock(ptep, ptl);
