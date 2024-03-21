@@ -612,6 +612,11 @@ static inline bool pud_table(pud_t pud) { return true; }
 #endif
 
 #ifdef CONFIG_ALTRA_ERRATUM_82288
+u64 __arm64_get_vn_dt(int n, int t);
+void __arm64_set_vn_dt(int n, int t, u64 val);
+#endif
+
+#ifdef CONFIG_ALTRA_ERRATUM_82288
 extern bool __read_mostly have_altra_erratum_82288;
 #endif
 
