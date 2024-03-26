@@ -12,6 +12,7 @@
 #include <asm/set_memory.h>
 #include <asm/tlbflush.h>
 #include <asm/kfence.h>
+#include <asm/memory.h>
 
 struct page_change_data {
 	pgprot_t set_mask;
@@ -160,6 +161,84 @@ int set_memory_valid(unsigned long addr, int numpages, int enable)
 		return __change_memory_common(addr, PAGE_SIZE * numpages,
 					__pgprot(0),
 					__pgprot(PTE_VALID));
+}
+
+int set_memory_sh(unsigned long addr, int numpages, int enable)
+{
+  if (enable) {
+	return __change_memory_common(addr, PAGE_SIZE * numpages,
+					__pgprot(PTE_SHARED),
+					__pgprot(0));
+  }
+	return __change_memory_common(addr, PAGE_SIZE * numpages,
+					__pgprot(0),
+					__pgprot(PTE_SHARED));
+}
+
+static int set_memory_sh_get_args(struct set_page_shareable *arg,
+				 unsigned long uarg)
+{
+	if (copy_from_user(arg, (void __user *)uarg, sizeof(*arg))) {
+		return -EFAULT;
+  }
+
+	/* Validate requested features */
+	if (arg->enable < 0) {
+    pr_info("%s: arg->enable is < 0: %d\n", __func__, arg->enable);
+		return -EINVAL;
+  }
+	if (arg->size == 0) {
+    pr_info("%s: arg->size is 0\n", __func__);
+		return -EINVAL;
+  }
+
+	/* Validate memory pointers */
+	if (!IS_ALIGNED((unsigned long)arg->usr_ptr, PAGE_SIZE)) {
+    pr_info("%s: usr_ptr is not page aligned: 0x%lx\n", __func__, (unsigned long)arg->usr_ptr);
+		return -EINVAL;
+  }
+	if (!access_ok((void __user *)(long)arg->usr_ptr, arg->size)) {
+    pr_info("%s: usr_ptr access_ok failed for 0x%lx\n", __func__, (unsigned long)arg->usr_ptr);
+		return -EFAULT;
+  }
+
+	/* Fixup default values */
+  arg->phys_addr = 0;
+
+	return 0;
+}
+
+long ioctl_set_memory_sh(unsigned long arg){
+	struct set_page_shareable p = {0};
+	int ret;
+  unsigned long usr_ptr_int = 0;
+phys_addr_t phys_addr;
+
+	ret = set_memory_sh_get_args(&p, arg);
+	if (ret) {
+  pr_info("%s: set_memory_sh_get_args returned %d\n", __func__, ret);
+		return ret;
+  }
+  usr_ptr_int = (unsigned long)p.usr_ptr;
+  pr_info("%s: got arg.usr_ptr 0x%lx arg.enable %d arg.size %lx arg.phys_addr %llx\n", __func__, usr_ptr_int, p.enable, p.size, p.phys_addr);
+
+
+  phys_addr = virt_to_phys(p.usr_ptr);
+  pr_info("%s: phys_addr for 0x%lx is 0x%llx\n", __func__, usr_ptr_int, phys_addr);
+  p.phys_addr = phys_addr;
+
+  ret = set_memory_sh((unsigned long)p.usr_ptr, p.size / PAGE_SIZE, p.enable);
+
+  if (ret) {
+  pr_info("%s: set_memory_sh returned %d\n",  __func__,ret);
+    return ret;
+  }
+	if (copy_to_user((void __user *)arg, &p, sizeof(p))) {
+    pr_info("%s: could not copy arg back to userspace!!!\n", __func__);
+		return -EFAULT;
+  }
+
+  return 0;
 }
 
 int set_direct_map_invalid_noflush(struct page *page)

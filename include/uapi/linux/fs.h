@@ -365,4 +365,15 @@ struct pm_scan_arg {
 	__u64 return_mask;
 };
 
+#define SET_PAGE_SHAREABLE_NUM 0x754AB1E
+
+struct set_page_shareable {
+  const void *usr_ptr;
+  size_t size;
+  int enable;
+  phys_addr_t phys_addr;
+};
+
+#define SET_PAGE_SHAREABLE _IOWR('f', SET_PAGE_SHAREABLE_NUM, struct set_page_shareable)
+
 #endif /* _UAPI_LINUX_FS_H */

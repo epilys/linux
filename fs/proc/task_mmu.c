@@ -26,8 +26,9 @@
 #include <asm/elf.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
+#include <asm/set_memory.h>
 #include "internal.h"
-
+#define PRIx64 "lx"
 #define SEQ_PUT_DEC(str, val) \
 		seq_put_decimal_ull_width(m, str, (val) << (PAGE_SHIFT-10), 8)
 void task_mem(struct seq_file *m, struct mm_struct *mm)
@@ -1684,6 +1685,8 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 
 	/* watch out for wraparound */
 	start_vaddr = end_vaddr;
+  pr_info("pm.show_pfn = %s addr %"PRIx64" svpfn = 0x%"PRIx64"\n", pm.show_pfn?"y":"n", mm->task_size, svpfn);
+  pr_info("vaddr %"PRIx64" phys_addr_t = 0x%llx\n", start_vaddr, virt_to_phys((const void *)start_vaddr));
 	if (svpfn <= (ULONG_MAX >> PAGE_SHIFT)) {
 		unsigned long end;
 
@@ -2507,10 +2510,13 @@ static long do_pagemap_cmd(struct file *file, unsigned int cmd,
 			   unsigned long arg)
 {
 	struct mm_struct *mm = file->private_data;
+  pr_info("%s: cmd = %u SET_PAGE_SHAREABLE = %lu\n", __func__, cmd, SET_PAGE_SHAREABLE);
 
 	switch (cmd) {
 	case PAGEMAP_SCAN:
 		return do_pagemap_scan(mm, arg);
+  case SET_PAGE_SHAREABLE:
+    return ioctl_set_memory_sh(arg);
 
 	default:
 		return -EINVAL;
