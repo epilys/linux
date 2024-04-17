@@ -2506,6 +2506,252 @@ static long do_pagemap_scan(struct mm_struct *mm, unsigned long uarg)
 	return ret;
 }
 
+static int set_memory_sh_get_args(struct set_page_shareable *arg,
+				 unsigned long uarg)
+{
+	if (copy_from_user(arg, (void __user *)uarg, sizeof(*arg))) {
+		return -EFAULT;
+  }
+
+	/* Validate requested features */
+	if (arg->enable < 0) {
+    pr_info("%s: arg->enable is < 0: %d\n", __func__, arg->enable);
+		return -EINVAL;
+  }
+	if (arg->size == 0) {
+    pr_info("%s: arg->size is 0\n", __func__);
+		return -EINVAL;
+  }
+
+	/* Validate memory pointers */
+	if (!IS_ALIGNED((unsigned long)arg->usr_ptr, PAGE_SIZE)) {
+    pr_info("%s: usr_ptr is not page aligned: 0x%lx\n", __func__, (unsigned long)arg->usr_ptr);
+		return -EINVAL;
+  }
+	if (!access_ok((void __user *)(long)arg->usr_ptr, arg->size)) {
+    pr_info("%s: usr_ptr access_ok failed for 0x%lx\n", __func__, (unsigned long)arg->usr_ptr);
+		return -EFAULT;
+  }
+
+	/* Fixup default values */
+  arg->phys_addr = 0;
+
+	return 0;
+}
+
+static long do_page_set_sh(struct mm_struct *mm, unsigned long arg)
+{
+  struct set_page_shareable p = {0};
+  unsigned long user_vaddr;
+  const volatile void* vaddr;
+  struct page *page;
+  int ret = 0;
+
+  ret = set_memory_sh_get_args(&p, arg);
+  if (ret) {
+    pr_info("%s: set_memory_sh_get_args returned %d\n", __func__, ret);
+    return ret;
+  }
+  user_vaddr = (unsigned long)p.usr_ptr;
+  pr_info("%s: got arg.usr_ptr 0x%lx arg.enable %d arg.size %ld arg.phys_addr 0x%llx\n", __func__, user_vaddr, p.enable, p.size, p.phys_addr);
+
+
+  if (fatal_signal_pending(current)) {
+    return -EINTR;
+  }
+
+  ret = mmap_read_lock_killable(mm);
+  if (ret) {
+    goto unlock;
+  }
+
+  /*
+   * The NULL 'tsk' here ensures that any faults that occur here
+   * will not be accounted to the task.  'mm' *is* current->mm,
+   * but we treat this as a 'remote' access since it is
+   * essentially a kernel access to the memory.
+   */
+  ret = get_user_pages_remote(mm, user_vaddr, 1, FOLL_FORCE, &page, NULL);
+  pr_info("%s: get_user_pages_remote returned %d\n", __func__, ret);
+  if (ret < 0) {
+    goto unlock;
+  }
+
+  vaddr = page_to_virt(page);
+  p.phys_addr = virt_to_phys(vaddr);
+  pr_info("%s: resolved phys addr: arg.usr_ptr 0x%lx kernel vaddr 0x%lx page address 0x%lx arg.phys_addr 0x%llx\n", __func__, user_vaddr, (unsigned long)vaddr, (unsigned long)page_address(page), p.phys_addr);
+
+  if (p.enable < 2) {
+  ret = set_memory_sh((unsigned long)vaddr, p.size / PAGE_SIZE, p.enable);
+  pr_info("%s: set_memory_sh returned %d\n",  __func__, ret);
+  }
+
+	if (ret == 0 && copy_to_user((void __user *)arg, &p, sizeof(p))) {
+    pr_info("%s: could not copy arg back to userspace!!!\n", __func__);
+		ret = -EFAULT;
+  }
+  put_page(page);
+
+unlock:
+  mmap_read_unlock(mm);
+
+  return ret;
+}
+
+/*
+ * Returns a 'struct page' if the pfn is "valid" and backed by a refcounted
+ * page, NULL otherwise.  Note, the list of refcounted PG_reserved page types
+ * is likely incomplete, it has been compiled purely through people wanting to
+ * back guest with a certain type of memory and encountering issues.
+ */
+static struct page *pfn_to_refcounted_page(pfn_t pfn)
+{
+	struct page *page;
+
+	if (!pfn_valid(pfn.val))
+		return NULL;
+
+	page = pfn_to_page(pfn.val);
+	if (!PageReserved(page))
+		return page;
+
+	/* The ZERO_PAGE(s) is marked PG_reserved, but is refcounted. */
+	if (is_zero_pfn(pfn.val))
+		return page;
+
+	/*
+	 * ZONE_DEVICE pages currently set PG_reserved, but from a refcounting
+	 * perspective they are "normal" pages, albeit with slightly different
+	 * usage rules.
+	 */
+	if (is_zone_device_page(page))
+		return page;
+
+	return NULL;
+}
+
+
+static int try_get_pfn(pfn_t pfn)
+{
+	struct page *page = pfn_to_refcounted_page(pfn);
+
+	if (!page)
+		return 1;
+
+	return get_page_unless_zero(page);
+}
+
+
+static int hva_to_pfn_remapped(struct vm_area_struct *vma,
+			       unsigned long addr, bool write_fault,
+			       bool *writable, pfn_t *p_pfn)
+{
+	pfn_t pfn;
+	pte_t *ptep;
+	pte_t pte;
+	spinlock_t *ptl;
+	int r;
+
+	r = follow_pte(vma->vm_mm, addr, &ptep, &ptl);
+	if (r) {
+		/*
+		 * get_user_pages fails for VM_IO and VM_PFNMAP vmas and does
+		 * not call the fault handler, so do it here.
+		 */
+		bool unlocked = false;
+		r = fixup_user_fault(current->mm, addr,
+				     (write_fault ? FAULT_FLAG_WRITE : 0),
+				     &unlocked);
+		if (unlocked)
+			return -EAGAIN;
+		if (r)
+			return r;
+
+		r = follow_pte(vma->vm_mm, addr, &ptep, &ptl);
+		if (r)
+			return r;
+	}
+
+	pte = ptep_get(ptep);
+
+	if (write_fault && !pte_write(pte)) {
+    r = -1;
+    pr_info("%s: pfn = KVM_PFN_ERR_RO_FAULT;\n", __func__);
+		goto out;
+	}
+
+	if (writable)
+		*writable = pte_write(pte);
+	pfn.val = pte_pfn(pte);
+
+	if (!try_get_pfn(pfn)) {
+		// r = -EFAULT;
+	    printk("Not force EFAULT: %s %d r = %d, pfn = 0x%016llx\n", __FUNCTION__, __LINE__, r, pfn.val);
+    // https://www.collabora.com/news-and-blog/blog/2021/11/26/venus-on-qemu-enabling-new-virtual-vulkan-driver/#qcom1343
+  }
+
+out:
+	pte_unmap_unlock(ptep, ptl);
+	*p_pfn = pfn;
+
+	return r;
+}
+
+
+static long do_page_get_pfn(struct mm_struct *mm, unsigned long arg)
+{
+  struct set_page_shareable p = {0};
+  unsigned long user_vaddr;
+  int ret = 0;
+
+  ret = set_memory_sh_get_args(&p, arg);
+  if (ret) {
+    pr_info("%s: set_memory_sh_get_args returned %d\n", __func__, ret);
+    return ret;
+  }
+  user_vaddr = (unsigned long)p.usr_ptr;
+  pr_info("%s: got arg.usr_ptr 0x%lx arg.enable %d arg.size %ld arg.phys_addr 0x%llx\n", __func__, user_vaddr, p.enable, p.size, p.phys_addr);
+
+
+  if (fatal_signal_pending(current)) {
+    return -EINTR;
+  }
+
+  ret = mmap_read_lock_killable(mm);
+  if (ret) {
+    goto unlock;
+  }
+
+  struct vm_area_struct *vma;
+retry:
+	vma = vma_lookup(mm, user_vaddr);
+
+	if (vma == NULL) {
+		ret = -EFAULT;
+  } else if (vma->vm_flags & (VM_IO | VM_PFNMAP)) {
+    pfn_t temp = { 0 };
+		ret = hva_to_pfn_remapped(vma, user_vaddr, true, NULL, &temp);
+		if (ret == -EAGAIN) {
+			goto retry;
+    }
+		if (ret < 0) {
+      ret = -EFAULT;
+    } else {
+      p.phys_addr = temp.val << PAGE_SHIFT;
+      if (ret == 0 && copy_to_user((void __user *)arg, &p, sizeof(p))) {
+        pr_info("%s: could not copy arg back to userspace!!!\n", __func__);
+        ret = -EFAULT;
+      }
+    }
+	} else {
+    ret = -EFAULT;
+	}
+unlock:
+  mmap_read_unlock(mm);
+
+  return ret;
+}
+
 static long do_pagemap_cmd(struct file *file, unsigned int cmd,
 			   unsigned long arg)
 {
@@ -2516,8 +2762,9 @@ static long do_pagemap_cmd(struct file *file, unsigned int cmd,
 	case PAGEMAP_SCAN:
 		return do_pagemap_scan(mm, arg);
   case SET_PAGE_SHAREABLE:
-    return ioctl_set_memory_sh(arg);
-
+    return do_page_set_sh(mm, arg);
+  case GET_PAGE_PFN:
+    return do_page_get_pfn(mm, arg);
 	default:
 		return -EINVAL;
 	}

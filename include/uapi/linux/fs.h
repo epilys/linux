@@ -366,6 +366,7 @@ struct pm_scan_arg {
 };
 
 #define SET_PAGE_SHAREABLE_NUM 0x754AB1E
+#define GET_PAGE_PFN_NUM 0x754AB1F
 
 struct set_page_shareable {
   const void *usr_ptr;
@@ -375,5 +376,6 @@ struct set_page_shareable {
 };
 
 #define SET_PAGE_SHAREABLE _IOWR('f', SET_PAGE_SHAREABLE_NUM, struct set_page_shareable)
+#define GET_PAGE_PFN _IOWR('f', GET_PAGE_PFN_NUM, struct set_page_shareable)
 
 #endif /* _UAPI_LINUX_FS_H */
