@@ -1685,8 +1685,6 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 
 	/* watch out for wraparound */
 	start_vaddr = end_vaddr;
-  pr_info("pm.show_pfn = %s addr %"PRIx64" svpfn = 0x%"PRIx64"\n", pm.show_pfn?"y":"n", mm->task_size, svpfn);
-  pr_info("vaddr %"PRIx64" phys_addr_t = 0x%llx\n", start_vaddr, virt_to_phys((const void *)start_vaddr));
 	if (svpfn <= (ULONG_MAX >> PAGE_SHIFT)) {
 		unsigned long end;
 
@@ -1700,6 +1698,8 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 		if (end >= start_vaddr && end < mm->task_size)
 			end_vaddr = end;
 	}
+  pr_info("pm.show_pfn = %s addr %"PRIx64" svpfn = 0x%"PRIx64"\n", pm.show_pfn?"y":"n", mm->task_size, svpfn);
+  pr_info("vaddr %"PRIx64" phys_addr_t = 0x%llx\n", start_vaddr, virt_to_phys((const void *)start_vaddr));
 
 	/* Ensure the address is inside the task */
 	if (start_vaddr > mm->task_size)

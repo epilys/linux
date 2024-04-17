@@ -154,6 +154,8 @@ static int virtio_gpu_vram_map(struct virtio_gpu_object *bo)
 				 bo->base.base.size);
 	spin_unlock(&vgdev->host_visible_lock);
 
+  pr_info("%s: resolved phys addr: vram_node.start 0x%llx phys_addr 0x%llx\n", __func__, vram->vram_node.start, virt_to_phys((void *)vram->vram_node.start));
+
 	if (ret)
 		return ret;
 
