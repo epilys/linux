@@ -93,6 +93,7 @@
 #include "time.c"
 #include "uaccess.c"
 #include "usb.c"
+#include "virtio.c"
 #include "vmalloc.c"
 #include "wait.c"
 #include "workqueue.c"

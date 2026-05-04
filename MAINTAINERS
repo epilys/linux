@@ -28230,6 +28230,13 @@ F:	include/uapi/linux/virtio_*.h
 F:	net/vmw_vsock/virtio*
 F:	tools/virtio/
 
+VIRTIO CORE API BINDINGS [RUST]
+M:	Manos Pitsidianakis <manos@pitsidianak.is>
+L:	virtualization@lists.linux.dev
+L:	rust-for-linux@vger.kernel.org
+S:	Maintained
+F:	rust/helpers/virtio.c
+
 VIRTIO CRYPTO DRIVER
 M:	Gonglei <arei.gonglei@huawei.com>
 L:	virtualization@lists.linux.dev
