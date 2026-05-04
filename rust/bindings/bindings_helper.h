@@ -89,6 +89,10 @@
 #include <linux/task_work.h>
 #include <linux/tracepoint.h>
 #include <linux/usb.h>
+#if IS_ENABLED(CONFIG_VIRTIO)
+#include <linux/virtio_config.h>
+#include <linux/virtio_ids.h>
+#endif /* IS_ENABLED(CONFIG_VIRTIO) */
 #include <linux/wait.h>
 #include <linux/workqueue.h>
 #include <linux/xarray.h>
