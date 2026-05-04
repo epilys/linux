@@ -28236,6 +28236,8 @@ L:	virtualization@lists.linux.dev
 L:	rust-for-linux@vger.kernel.org
 S:	Maintained
 F:	rust/helpers/virtio.c
+F:	rust/kernel/virtio.rs
+F:	rust/kernel/virtio/
 
 VIRTIO CRYPTO DRIVER
 M:	Gonglei <arei.gonglei@huawei.com>

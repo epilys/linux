@@ -693,3 +693,21 @@ impl<T> AsPageIter for VBox<T> {
         unsafe { VmallocPageIter::new(ptr, size) }
     }
 }
+
+#[cfg(CONFIG_VIRTIO = "y")]
+// SAFETY: `KBox` uses kmalloc so it's contiguous
+unsafe impl<T> crate::virtio::virtqueue::VirtqueueMappable for KBox<T> {
+    type Target = T;
+
+    fn size(&self) -> usize {
+        core::mem::size_of::<T>()
+    }
+
+    fn data(&self) -> *const Self::Target {
+        if core::mem::size_of::<T>() == 0 {
+            // Don't return dangling pointers for ZST.
+            return core::ptr::null();
+        }
+        self.0.cast().as_ptr()
+    }
+}
