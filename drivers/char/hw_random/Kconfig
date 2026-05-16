@@ -254,6 +254,19 @@ config HW_RANDOM_VIRTIO
 	  To compile this driver as a module, choose M here: the
 	  module will be called virtio-rng.  If unsure, say N.
 
+config HW_RANDOM_VIRTIO_RUST
+	tristate "VirtIO Random Number Generator support"
+	depends on VIRTIO
+	depends on RUST
+	depends on HW_RANDOM=y
+	depends on HW_RANDOM_VIRTIO=n
+	help
+	  This driver provides kernel-side support for the virtual Random Number
+	  Generator hardware.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called virtio-rng.  If unsure, say N.
+
 config HW_RANDOM_MXC_RNGA
 	tristate "Freescale i.MX RNGA Random Number Generator"
 	depends on SOC_IMX31 || COMPILE_TEST

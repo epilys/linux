@@ -28378,6 +28378,14 @@ S:	Maintained
 F:	drivers/nvdimm/nd_virtio.c
 F:	drivers/nvdimm/virtio_pmem.c
 
+VIRTIO RNG DRIVER [RUST]
+M:	Manos Pitsidianakis <manos@pitsidianak.is>
+L:	virtualization@lists.linux.dev
+L:	linux-crypto@vger.kernel.org
+L:	rust-for-linux@vger.kernel.org
+S:	Maintained
+F:	drivers/char/hw_random/virtio_rng.rs
+
 VIRTIO RTC DRIVER
 M:	Peter Hilber <peter.hilber@oss.qualcomm.com>
 L:	virtualization@lists.linux.dev
