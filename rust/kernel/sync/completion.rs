@@ -90,6 +90,13 @@ impl Completion {
         self.inner.get()
     }
 
+    /// Reinitialize a completion so it can be reused.
+    #[inline]
+    pub fn reinit(&self) {
+        // SAFETY: `self.as_raw()` is a pointer to a valid `struct completion`.
+        unsafe { bindings::reinit_completion(self.as_raw()) };
+    }
+
     /// Signal all tasks waiting on this completion.
     ///
     /// This method wakes up all tasks waiting on this completion; after this operation the
