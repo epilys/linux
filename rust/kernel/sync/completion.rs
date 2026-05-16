@@ -125,4 +125,17 @@ impl Completion {
         // SAFETY: `self.as_raw()` is a pointer to a valid `struct completion`.
         unsafe { bindings::wait_for_completion(self.as_raw()) };
     }
+
+    /// Wait for completion of a task, can be interrupted by a kill signal.
+    ///
+    /// Returns `ERESTARTSYS` if interrupted.
+    #[inline]
+    pub fn wait_for_completion_killable(&self) -> Result {
+        // SAFETY: `self.as_raw()` is a pointer to a valid `struct completion`.
+        let ret = unsafe { bindings::wait_for_completion_killable(self.as_raw()) };
+        if ret < 0 {
+            return Err(Error::from_errno(ret as c_int));
+        }
+        Ok(())
+    }
 }
