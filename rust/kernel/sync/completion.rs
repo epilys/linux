@@ -97,6 +97,15 @@ impl Completion {
         unsafe { bindings::reinit_completion(self.as_raw()) };
     }
 
+    /// Signal a single task waiting on this completion.
+    ///
+    /// This method wakes up a single task waiting on this completion.
+    #[inline]
+    pub fn complete(&self) {
+        // SAFETY: `self.as_raw()` is a pointer to a valid `struct completion`.
+        unsafe { bindings::complete(self.as_raw()) };
+    }
+
     /// Signal all tasks waiting on this completion.
     ///
     /// This method wakes up all tasks waiting on this completion; after this operation the
